@@ -2,7 +2,7 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "mainyuk/app",
     "type": "project",
-    "description": "MainYuk \u2014 Platform Booking Lapangan Olahraga",
+    "description": "MainYuk — Platform Booking Lapangan Olahraga",
     "keywords": [
         "laravel",
         "inertia",
@@ -96,6 +96,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.3.27"
         }
     },
     "minimum-stability": "stable",
