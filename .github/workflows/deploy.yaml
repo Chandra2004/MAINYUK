@@ -81,15 +81,19 @@ jobs:
           # Buat script unzip.php untuk dieksekusi di server hosting
           cat << 'EOF' > deploy-dist/unzip.php
           <?php
+          ini_set('max_execution_time', 600);
+          set_time_limit(600);
+          ignore_user_abort(true);
+
           $zipFile = 'deploy.zip';
           if (file_exists($zipFile)) {
               $zip = new ZipArchive;
               if ($zip->open($zipFile) === TRUE) {
                   $zip->extractTo(__DIR__);
                   $zip->close();
-                  echo "SUCCESS: Extraction complete.";
                   unlink($zipFile);
                   unlink(__FILE__);
+                  echo "SUCCESS: Extraction complete.";
               } else {
                   echo "ERROR: Failed to open zip archive.";
               }
@@ -109,13 +113,22 @@ jobs:
           local-dir: ./deploy-dist/
           dangerous-clean-slate: false
 
-      - name: 🚀 Trigger Unzip via HTTP Request
+      - name: 🚀 Trigger Unzip and Poll for Completion
         run: |
-          response=$(curl -s "http://mainyuk.ct.ws/unzip.php")
-          echo "Response from server: $response"
-          if [[ "$response" == *"SUCCESS"* ]]; then
-              echo "Deployment succeeded and files extracted."
-          else
-              echo "Failed to extract archive: $response"
-              exit 1
-          fi
+          echo "Triggering unzip.php..."
+          # Kirim request trigger, abaikan jika koneksi terputus prematur (curl exit 52 atau timeout)
+          curl -s -m 15 "http://mainyuk.ct.ws/unzip.php" || true
+          
+          # Lakukan polling untuk memeriksa apakah unzip.php sudah selesai mengekstrak dan menghapus dirinya sendiri
+          echo "Waiting for extraction to complete..."
+          for i in {1..20}; do
+            status_code=$(curl -o /dev/null -s -w "%{http_code}" "http://mainyuk.ct.ws/unzip.php")
+            echo "Check $i: unzip.php HTTP status is $status_code"
+            if [ "$status_code" -eq 404 ]; then
+              echo "SUCCESS: Extraction complete (unzip.php successfully cleaned up)."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: Extraction timed out or failed."
+          exit 1
