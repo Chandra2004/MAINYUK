@@ -42,7 +42,7 @@ jobs:
 
       - name: 📁 Prepare Storage & Cleanup Garbage
         run: |
-          # Create required storage structure
+          # Create required storage structure inside build
           mkdir -p storage/framework/{sessions,views,cache}
           mkdir -p storage/logs
           mkdir -p storage/app/uploads/{profiles,ktp_documents,akta_documents,kk_documents}
@@ -55,55 +55,36 @@ jobs:
           touch storage/app/uploads/akta_documents/.gitkeep
           touch storage/app/uploads/kk_documents/.gitkeep
 
-          # REMOVE GARBAGE (To speed up deployment)
+          # REMOVE GARBAGE (To shrink ZIP size)
           rm -rf docker
           rm -rf stubs
           rm -f sail
-          # Remove thousands of unnecessary icons from public
           rm -rf public/vendor/blade-lucide-icons
 
-          # CLEAR CACHE FILES (Ensures fresh config on server)
+          # CLEAR CACHE FILES
           rm -f bootstrap/cache/*.php
 
       - name: 🔐 Create .env file
         env:
           ENV_PROD_EXTRAS: ${{ secrets.ENV_PROD_EXTRAS }}
         run: |
-          # Use printf to ensure $ characters and spaces are preserved correctly in .env
           printf '%s\n' "$ENV_PROD_EXTRAS" >> .env
 
-      - name: Sync files to InfinityFree
+      - name: 🗜️ Zip and Prepare for FTP
+        run: |
+          # Buat folder khusus agar FTP hanya mengunggah file ZIP saja
+          mkdir deploy-dist
+
+          # Compress semua project menjadi satu file deploy.zip di dalam folder deploy-dist
+          zip -r deploy-dist/deploy.zip . -x "node_modules/*" "tests/*" ".git*" ".github*" "deploy-dist/*"
+
+      - name: Sync ZIP file to InfinityFree
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: mainyuk.ct.ws/htdocs/
-          timeout: 3600000
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/.idx/**
-            **/.BACKUP/**
-            **/.cursorrules
-            **/.dockerignore
-            **/docker/**
-            **/Dockerfile
-            **/tests/**
-            **/node_modules/**
-            **/docs/**
-            **/phpunit.xml
-            **/.env.example
-            **/README.md
-            **/CHANGELOG.md
-            **/CODE_OF_CONDUCT.md
-            **/CONTRIBUTING.md
-            **/SECURITY.md
-            **/UPGRADE.md
-            **/LICENSE
-            storage/logs/**
-            storage/framework/views/**
-            storage/framework/cache/**
-            storage/app/**
-            !storage/**/
+          # Kita arahkan ke folder deploy-dist agar HANYA file deploy.zip yang di-upload
+          local-dir: ./deploy-dist/
+          dangerous-clean-slate: false
