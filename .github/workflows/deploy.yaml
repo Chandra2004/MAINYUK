@@ -78,6 +78,26 @@ jobs:
           # Compress semua project menjadi satu file deploy.zip di dalam folder deploy-dist
           zip -r deploy-dist/deploy.zip . -x "node_modules/*" "tests/*" ".git*" ".github*" "deploy-dist/*"
 
+          # Buat script unzip.php untuk dieksekusi di server hosting
+          cat << 'EOF' > deploy-dist/unzip.php
+          <?php
+          $zipFile = 'deploy.zip';
+          if (file_exists($zipFile)) {
+              $zip = new ZipArchive;
+              if ($zip->open($zipFile) === TRUE) {
+                  $zip->extractTo(__DIR__);
+                  $zip->close();
+                  echo "SUCCESS: Extraction complete.";
+                  unlink($zipFile);
+                  unlink(__FILE__);
+              } else {
+                  echo "ERROR: Failed to open zip archive.";
+              }
+          } else {
+              echo "ERROR: Zip file not found.";
+          }
+          EOF
+
       - name: Sync ZIP file to InfinityFree
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -85,6 +105,17 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: mainyuk.ct.ws/htdocs/
-          # Kita arahkan ke folder deploy-dist agar HANYA file deploy.zip yang di-upload
+          # Kita arahkan ke folder deploy-dist agar HANYA file deploy.zip dan unzip.php yang di-upload
           local-dir: ./deploy-dist/
           dangerous-clean-slate: false
+
+      - name: 🚀 Trigger Unzip via HTTP Request
+        run: |
+          response=$(curl -s "http://mainyuk.ct.ws/unzip.php")
+          echo "Response from server: $response"
+          if [[ "$response" == *"SUCCESS"* ]]; then
+              echo "Deployment succeeded and files extracted."
+          else
+              echo "Failed to extract archive: $response"
+              exit 1
+          fi
