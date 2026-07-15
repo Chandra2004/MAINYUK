@@ -104,23 +104,16 @@ jobs:
           local-dir: ./deploy-dist/
           dangerous-clean-slate: false
 
-      - name: 🚀 Trigger Unzip and Poll for Completion
+      - name: 🚀 Trigger Unzip (Automatic & Manual)
         run: |
-          echo "Triggering unzip.php..."
-          # Kirim request trigger, abaikan jika koneksi terputus prematur (curl exit 52 atau timeout)
-          curl -s -m 15 "http://mainyuk.ct.ws/unzip.php" || true
+          echo "Attempting to trigger unzip.php automatically..."
+          # Kirim request trigger, abaikan jika diblokir oleh sistem keamanan InfinityFree (memicu di background jika beruntung)
+          curl -s -m 10 "https://mainyuk.ct.ws/unzip.php" || true
           
-          # Lakukan polling untuk memeriksa apakah unzip.php sudah selesai mengekstrak dan menghapus dirinya sendiri
-          echo "Waiting for extraction to complete..."
-          for i in {1..30}; do
-            # Gunakan || echo "000" agar jika curl gagal/error 52, shell script tidak langsung crash (exit code 52)
-            status_code=$(curl -o /dev/null -s -w "%{http_code}" "http://mainyuk.ct.ws/unzip.php" || echo "000")
-            echo "Check $i: unzip.php HTTP status is $status_code"
-            if [ "$status_code" -eq 404 ]; then
-              echo "SUCCESS: Extraction complete (unzip.php successfully cleaned up)."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "ERROR: Extraction timed out or failed."
-          exit 1
+          echo "================================================================"
+          echo "🎉 FTP Upload Succeeded!"
+          echo "Karena sistem keamanan InfinityFree memblokir akses otomatis (bot/curl),"
+          echo "Silakan buka tautan berikut di browser Anda untuk menyelesaikan ekstraksi:"
+          echo "👉 https://mainyuk.ct.ws/unzip.php"
+          echo "================================================================"
+
