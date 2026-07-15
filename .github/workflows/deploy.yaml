@@ -76,7 +76,7 @@ jobs:
           set_time_limit(600);
           ignore_user_abort(true);
 
-          $zipFile = 'deploy.zip';
+          $zipFile = __DIR__ . '/deploy.zip';
           if (file_exists($zipFile)) {
               $zip = new ZipArchive;
               if ($zip->open($zipFile) === TRUE) {
