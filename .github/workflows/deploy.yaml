@@ -61,24 +61,66 @@ jobs:
         run: |
           printf '%s\n' "$ENV_PROD_EXTRAS" >> .env
 
-      - name: Sync files to InfinityFree
+      - name: 🗜️ Zip and Prepare for FTP
+        run: |
+          # Buat folder khusus agar FTP hanya mengunggah file ZIP saja
+          mkdir deploy-dist
+
+          # Compress semua project menjadi satu file deploy.zip di dalam folder deploy-dist
+          zip -r deploy-dist/deploy.zip . -x "node_modules/*" "tests/*" ".git*" ".github*" "deploy-dist/*"
+
+          # Buat script unzip.php untuk dieksekusi di server hosting
+          cat << 'EOF' > deploy-dist/unzip.php
+          <?php
+          ini_set('max_execution_time', 600);
+          set_time_limit(600);
+          ignore_user_abort(true);
+
+          $zipFile = 'deploy.zip';
+          if (file_exists($zipFile)) {
+              $zip = new ZipArchive;
+              if ($zip->open($zipFile) === TRUE) {
+                  $zip->extractTo(__DIR__);
+                  $zip->close();
+                  unlink($zipFile);
+                  unlink(__FILE__);
+                  echo "SUCCESS: Extraction complete.";
+              } else {
+                  echo "ERROR: Failed to open zip archive.";
+              }
+          } else {
+              echo "ERROR: Zip file not found.";
+          }
+          EOF
+
+      - name: Sync ZIP file to InfinityFree
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: mainyuk.ct.ws/htdocs/
-          local-dir: ./
+          # Kita arahkan ke folder deploy-dist agar HANYA file deploy.zip dan unzip.php yang di-upload
+          local-dir: ./deploy-dist/
           dangerous-clean-slate: false
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/node_modules/**
-            **/tests/**
-            **/phpunit.xml
-            **/.env.example
-            **/README.md
-            **/package.json
-            **/package-lock.json
-            **/vite.config.js
+
+      - name: 🚀 Trigger Unzip and Poll for Completion
+        run: |
+          echo "Triggering unzip.php..."
+          # Kirim request trigger, abaikan jika koneksi terputus prematur (curl exit 52 atau timeout)
+          curl -s -m 15 "http://mainyuk.ct.ws/unzip.php" || true
+          
+          # Lakukan polling untuk memeriksa apakah unzip.php sudah selesai mengekstrak dan menghapus dirinya sendiri
+          echo "Waiting for extraction to complete..."
+          for i in {1..30}; do
+            # Gunakan || echo "000" agar jika curl gagal/error 52, shell script tidak langsung crash (exit code 52)
+            status_code=$(curl -o /dev/null -s -w "%{http_code}" "http://mainyuk.ct.ws/unzip.php" || echo "000")
+            echo "Check $i: unzip.php HTTP status is $status_code"
+            if [ "$status_code" -eq 404 ]; then
+              echo "SUCCESS: Extraction complete (unzip.php successfully cleaned up)."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: Extraction timed out or failed."
+          exit 1
