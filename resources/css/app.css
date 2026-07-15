@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../../node_modules/flowbite/**/*.js';
+
+@theme {
+    --font-sans: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── MainYuk Design System Variables ─── */
+:root {
+  --house-green:       #1E3932;
+  --sbux-green:        #006241;
+  --green-accent:      #00754A;
+  --green-light:       #d4e9e2;
+  --canvas:            #f2f0eb;
+  --gold:              #cba258;
+  --error:             #c82014;
+  --border:            rgba(0,0,0,0.10);
+  --text-black:        rgba(0,0,0,0.87);
+  --text-soft:         rgba(0,0,0,0.58);
+  --text-on-dark:      rgba(255,255,255,0.87);
+  --text-on-dark-soft: rgba(255,255,255,0.70);
+  --radius-pill:       50px;
+  --radius-card:       12px;
+  --transition:        0.2s ease;
+}
+
+/* ─── Global Reset ─── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--canvas);
+  color: var(--text-black);
+  -webkit-font-smoothing: antialiased;
+}
+a { text-decoration: none; color: inherit; transition: all var(--transition); }
+ul { list-style: none; }
+img { display: block; max-width: 100%; }
+
+/* Join Strip Link Styling */
+.join-strip-link {
+  color: var(--gold) !important;
+  text-decoration: underline !important;
+  text-underline-offset: 4px;
+  font-weight: 700;
+  margin-left: 0.5rem;
+  transition: color var(--transition);
+}
+.join-strip-link:hover {
+  color: #ffffff !important;
+}
+
+/* Green Text Link Styling */
+.text-link {
+  color: var(--sbux-green) !important;
+  font-weight: 700;
+  transition: color var(--transition);
+}
+.text-link:hover {
+  text-decoration: underline !important;
+}
+
+/* Gray Back Link Styling */
+.back-link {
+  color: #6b7280 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: color var(--transition);
+}
+.back-link:hover {
+  color: var(--sbux-green) !important;
+}
+
+
