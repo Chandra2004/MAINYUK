@@ -52,30 +52,77 @@ jobs:
         run: |
           cat << 'EOF' > unzip.php
           <?php
-          $zip = new ZipArchive;
-          $res = $zip->open('build.zip');
-          if ($res === TRUE) {
-              $zip->extractTo(__DIR__);
-              $zip->close();
-              echo "EXTRACTION_SUCCESS";
-              
-              // Hapus file zip dan script ini agar storage hosting kembali bersih
-              unlink('build.zip');
-              unlink(__FILE__);
-          } else {
-              echo "EXTRACTION_FAILED";
+          $zips = glob('chunk_*.zip');
+          if (empty($zips)) {
+              echo "NO_ZIPS_FOUND";
+              exit;
           }
+
+          $successCount = 0;
+          foreach ($zips as $file) {
+              $zip = new ZipArchive;
+              if ($zip->open($file) === TRUE) {
+                  $zip->extractTo(__DIR__);
+                  $zip->close();
+                  unlink($file);
+                  $successCount++;
+              } else {
+                  echo "FAILED_TO_EXTRACT_$file\n";
+              }
+          }
+          echo "EXTRACTION_SUCCESS ($successCount files)";
+          unlink(__FILE__);
           ?>
           EOF
 
-      - name: Compress into build.zip
-        run: zip -q -r build.zip .
+      - name: Split project into small ZIP chunks
+        run: |
+          python3 -c "
+          import os
+          import zipfile
+
+          MAX_SIZE = 8 * 1024 * 1024 # 8 MB max per file untuk bypass limit InfinityFree
+
+          chunk_index = 1
+          current_size = 0
+          current_zip = None
+
+          def new_zip():
+              global chunk_index, current_size, current_zip
+              if current_zip:
+                  current_zip.close()
+              current_zip = zipfile.ZipFile(f'chunk_{chunk_index}.zip', 'w', zipfile.ZIP_DEFLATED)
+              chunk_index += 1
+              current_size = 0
+
+          new_zip()
+
+          for root, dirs, files in os.walk('.'):
+              if 'chunk_' in root or '.git' in root or 'node_modules' in root:
+                  continue
+              for file in files:
+                  if file.startswith('chunk_') and file.endswith('.zip'): continue
+                  filepath = os.path.join(root, file)
+                  filesize = os.path.getsize(filepath)
+                  
+                  if current_size + filesize > MAX_SIZE and current_size > 0:
+                      new_zip()
+                      
+                  current_zip.write(filepath, filepath)
+                  current_size += filesize
+
+          if current_zip:
+              current_zip.close()
+          "
 
       - name: Upload files via FTP (cURL)
         run: |
-          # Menggunakan cURL karena lebih stabil dan tidak mencoba "sync" / menghapus file lama
-          echo "Uploading build.zip..."
-          curl -T build.zip ftp://${{ secrets.FTP_SERVER }}/mainyuk.ct.ws/htdocs/build.zip --user ${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}
+          # Upload file chunk zip satu per satu
+          for zipfile in chunk_*.zip; do
+            echo "Uploading $zipfile..."
+            curl -T "$zipfile" ftp://${{ secrets.FTP_SERVER }}/mainyuk.ct.ws/htdocs/"$zipfile" --user ${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}
+          done
+          
           echo "Uploading unzip.php..."
           curl -T unzip.php ftp://${{ secrets.FTP_SERVER }}/mainyuk.ct.ws/htdocs/unzip.php --user ${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}
 
