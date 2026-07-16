@@ -82,14 +82,16 @@ jobs:
       - name: Trigger Unzip on Server
         run: |
           echo "Memicu proses unzip di server..."
-          curl -s -o response.txt http://mainyuk.ct.ws/unzip.php
-          cat response.txt
+          curl -s -o response.txt http://mainyuk.ct.ws/unzip.php || true
+          cat response.txt || true
           
-          if grep -q "EXTRACTION_SUCCESS" response.txt; then
+          if [ -f response.txt ] && grep -q "EXTRACTION_SUCCESS" response.txt; then
             echo -e "\n\n🚀 Deployment Berhasil dan file sudah terekstrak di server!"
           else
-            echo -e "\n\n⚠️ Ekstraksi via bot mungkin terhalang oleh sistem keamanan InfinityFree (Anti-Bot)."
-            echo "Namun file zip sudah berhasil di-upload."
-            echo "SILAKAN BUKA BROWSER ANDA DAN KUNJUNGI URL BERIKUT SECARA MANUAL UNTUK MENYELESAIKAN DEPLOY:"
-            echo "👉 http://mainyuk.ct.ws/unzip.php"
+            echo -e "\n\n⚠️ Ekstraksi otomatis dicegat oleh keamanan InfinityFree (Error 52)."
+            echo "Tidak masalah! File zip Anda sudah 100% ter-upload."
+            echo "========================================================================"
+            echo "👉 SILAKAN KLIK LINK INI DARI BROWSER ANDA UNTUK MENYELESAIKAN DEPLOY:"
+            echo "🌐 http://mainyuk.ct.ws/unzip.php"
+            echo "========================================================================"
           fi
