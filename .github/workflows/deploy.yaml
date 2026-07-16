@@ -8,17 +8,21 @@ on:
 
 jobs:
   deploy:
-    name: Build & FTP Deploy
+    name: Build, Zip & FTP Deploy
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_PROD_EXTRAS }}" > .env
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3' # Diubah ke 8.3 sesuai requirement composer.json Anda
+          php-version: '8.3'
           
       - name: Install Composer Dependencies
         run: composer install --optimize-autoloader --no-dev
@@ -34,16 +38,56 @@ jobs:
       - name: Build Frontend Assets
         run: npm run build
 
-      - name: Sync files to FTP server
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /mainyuk.ct.ws/htdocs/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            .github/
-            tests/
+      - name: Clean up unused files
+        run: |
+          # Menghapus file/folder yang tidak perlu diupload
+          rm -rf node_modules
+          rm -rf .git
+          rm -rf .github
+          rm -rf tests
+
+      - name: Create unzip.php
+        run: |
+          cat << 'EOF' > unzip.php
+          <?php
+          $zip = new ZipArchive;
+          $res = $zip->open('build.zip');
+          if ($res === TRUE) {
+              $zip->extractTo(__DIR__);
+              $zip->close();
+              echo "EXTRACTION_SUCCESS";
+              
+              // Hapus file zip dan script ini agar storage hosting kembali bersih
+              unlink('build.zip');
+              unlink(__FILE__);
+          } else {
+              echo "EXTRACTION_FAILED";
+          }
+          ?>
+          EOF
+
+      - name: Compress into build.zip
+        run: zip -q -r build.zip .
+
+      - name: Upload files via FTP (cURL)
+        run: |
+          # Menggunakan cURL karena lebih stabil dan tidak mencoba "sync" / menghapus file lama
+          echo "Uploading build.zip..."
+          curl -T build.zip ftp://${{ secrets.FTP_SERVER }}/mainyuk.ct.ws/htdocs/build.zip --user ${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}
+          echo "Uploading unzip.php..."
+          curl -T unzip.php ftp://${{ secrets.FTP_SERVER }}/mainyuk.ct.ws/htdocs/unzip.php --user ${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}
+
+      - name: Trigger Unzip on Server
+        run: |
+          echo "Memicu proses unzip di server..."
+          curl -s -o response.txt http://mainyuk.ct.ws/unzip.php
+          cat response.txt
+          
+          if grep -q "EXTRACTION_SUCCESS" response.txt; then
+            echo -e "\n\n🚀 Deployment Berhasil dan file sudah terekstrak di server!"
+          else
+            echo -e "\n\n⚠️ Ekstraksi via bot mungkin terhalang oleh sistem keamanan InfinityFree (Anti-Bot)."
+            echo "Namun file zip sudah berhasil di-upload."
+            echo "SILAKAN BUKA BROWSER ANDA DAN KUNJUNGI URL BERIKUT SECARA MANUAL UNTUK MENYELESAIKAN DEPLOY:"
+            echo "👉 http://mainyuk.ct.ws/unzip.php"
+          fi
